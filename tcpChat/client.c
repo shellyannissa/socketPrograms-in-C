@@ -50,45 +50,29 @@ int main(int argc, char *argv[])
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         error("Connection failed");
 
-    int num1, num2, choice, answer;
+    while (1)
+    {
+        bzero(buffer, 256);
+        fgets(buffer, 255, stdin);
+        n = write(sockfd, buffer, strlen(buffer));
+        if (n < 0)
+            error("Error on writing");
+        bzero(buffer, 256);
+        n = read(sockfd, buffer, 255);
+        if (n < 0)
+            error("Error on reading");
 
-S:
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, 255);
-    if (n < 0)
-        error("Error reading from socket");
+        if (n == 0)
+        {
+            printf("Server closed connection\n");
+            break;
+        }
+        printf("Server: %s\n", buffer);
 
-    printf("Server - %s\n", buffer);
-    scanf("%d", &num1);
-    write(sockfd, &num1, sizeof(int));
-
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, 255);
-    if (n < 0)
-        error("Error reading from socket");
-    printf("Server - %s\n", buffer);
-    scanf("%d", &num2);
-    write(sockfd, &num2, sizeof(int));
-
-    bzero(buffer, 256);
-    n = read(sockfd, buffer, 255);
-    if (n < 0)
-        error("Error reading from socket");
-    printf("Server - %s\n", buffer);
-    scanf("%d", &choice);
-    write(sockfd, &choice, sizeof(int));
-
-    if (choice == 5)
-        goto Q;
-
-    read(sockfd, &answer, sizeof(int));
-    printf("Server - The answer is: %d\n", answer);
-    if (choice != 5)
-        goto S;
-
-Q:
-    printf("You have chosen to exit. Exit Succesful.");
-
+        int i = strncmp("Bye", buffer, 3);
+        if (i == 0)
+            break;
+    }
     close(sockfd);
     return 0;
 }

@@ -1,0 +1,3 @@
+this is a sample file 
+that is going to be sent through 
+TCP protocol from client to server

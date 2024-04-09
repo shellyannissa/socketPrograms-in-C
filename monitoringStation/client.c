@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     // Additional checks can be inserted
     if (argc < 2)
     {
-        perror("Usage: UDPClient <server IP address> <station>");
+        perror("Usage: UDPClient <server IP address> <temperature> <battery>");
         exit(1);
     }
 

@@ -22,13 +22,13 @@ The server will tabulate the average of temperature readings and send it back to
 double cumulativeTemp = 0;
 double clientCount = 0;
 
-
 // The arguments needed to send a response
-struct thread_arguments {
+struct thread_arguments
+{
     char temperature[MAX_LEN];
-    char battery[MAX_LEN];  
+    char battery[MAX_LEN];
     struct sockaddr client_address;
-    socklen_t       client_length;
+    socklen_t client_length;
 };
 
 // Function to handle client requests
@@ -43,16 +43,17 @@ static void *send_response(void *arg)
     double battery = atoi(args->battery);
 
     cumulativeTemp += temperature;
-    clientCount ++;
+    clientCount++;
     double avg = cumulativeTemp / clientCount;
-    
-    if(battery < 30) {
+
+    if (battery < 30)
+    {
         snprintf(out, TEMPERATURE_SIZE, "\nBattery Level below critical Value.\nAverage:%5.1f", avg);
     }
     else
         snprintf(out, TEMPERATURE_SIZE, "\nAverage:%5.1f", avg);
 
-    int fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    int fd = socket(AF_INET, SOCK_DGRAM, 0);
     sendto(fd, out, TEMPERATURE_SIZE, 0, &(args->client_address), args->client_length);
     close(fd);
 
@@ -71,7 +72,7 @@ int main(void)
     socklen_t client_length = sizeof(struct sockaddr);
 
     // Create an IP4/UDP socket
-    fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
 
     // Initialize the address of this host
     memset(&address, 0, sizeof(address));
@@ -88,10 +89,10 @@ int main(void)
         struct thread_arguments *args = (struct thread_arguments *)malloc(sizeof(struct thread_arguments));
         // Receive the request
         recvfrom(fd, in, MAX_LEN, 0,
-                (struct sockaddr *)&client_address, &client_length);
+                 (struct sockaddr *)&client_address, &client_length);
         strncpy(args->temperature, in, MAX_LEN);
         recvfrom(fd, in, MAX_LEN, 0,
-                (struct sockaddr *)&client_address, &client_length);
+                 (struct sockaddr *)&client_address, &client_length);
         strncpy(args->battery, in, MAX_LEN);
 
         // Make a copy of the message and the client address
@@ -105,13 +106,16 @@ int main(void)
 
         // Store the thread handle for later joining
         int i;
-        for (i = 0; i < MAX_CLIENTS; i++) {
-            if (!helpers[i]) {
+        for (i = 0; i < MAX_CLIENTS; i++)
+        {
+            if (!helpers[i])
+            {
                 helpers[i] = *helper;
                 break;
             }
         }
-        if (i == MAX_CLIENTS) {
+        if (i == MAX_CLIENTS)
+        {
             fprintf(stderr, "Maximum clients reached, cannot accept more connections\n");
             free(helper);
         }
@@ -119,8 +123,10 @@ int main(void)
 
     // Join all the threads
     int i;
-    for (i = 0; i < MAX_CLIENTS; i++) {
-        if (helpers[i]) {
+    for (i = 0; i < MAX_CLIENTS; i++)
+    {
+        if (helpers[i])
+        {
             pthread_join(helpers[i], NULL);
         }
     }
@@ -128,6 +134,3 @@ int main(void)
     close(fd);
     return 0;
 }
-
-
-

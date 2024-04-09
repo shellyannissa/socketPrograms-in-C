@@ -88,7 +88,6 @@ void sending()
     // Fetching port number
     int PORT_server;
 
-    // IN PEER WE TRUST
     printf("Enter the port to send message:"); // Considering each peer will enter different port
     scanf("%d", &PORT_server);
 

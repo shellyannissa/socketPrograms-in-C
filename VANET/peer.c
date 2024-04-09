@@ -1,127 +1,130 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <pthread.h>
+#include <string.h>
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
-
-struct VehicleData
+struct vehicle
 {
-    int vehicle_id;
-    float speed;
-    int direction; // 0 or 1 indicating direction of motion
+	int vehicle_id;
+	float speed;
+	int direction;
 };
+
+struct vehicle vehicleList[5];
+
+#define VEHICLE_COUNT 5
 
 void *receive_data(void *arg)
 {
-    int sockfd;
-    struct sockaddr_in address;
-    struct VehicleData vehicle_data;
-    int addrlen = sizeof(address);
+	int PORT = *(int *)arg;
+	struct sockaddr_in address;
+	socklen_t addr_len = sizeof(address);
+	struct sockaddr_in cli_addr;
+	int sockfd;
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	{
+		perror("Error while creating socket");
+		exit(1);
+	}
+	memset(&address, '\0', sizeof(address));
+	address.sin_family = AF_INET;
+	address.sin_port = htons(PORT);
+	address.sin_addr.s_addr = INADDR_ANY;
 
-    // Create UDP socket
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-    {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+	if (bind(sockfd, (struct sockaddr *)&address, sizeof(address)) < 0)
+	{
+		perror("bind failed");
+		exit(1);
+	}
 
-    memset(&address, 0, sizeof(address));
+	struct vehicle vehicle_data;
+	while (1)
+	{
+		if (recvfrom(sockfd, (struct vehicle *)&vehicle_data, sizeof(vehicle_data), 0,
+					 (struct sockaddr *)&cli_addr, &addr_len) < 0)
+		{
+			perror("Error while receieving");
+			exit(1);
+		}
+		int idx = vehicle_data.vehicle_id - 8000;
+		vehicleList[idx] = vehicle_data;
 
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(PORT);
-
-    // Bind socket
-    if (bind(sockfd, (const struct sockaddr *)&address, sizeof(address)) < 0)
-    {
-        perror("Bind failed");
-        exit(EXIT_FAILURE);
-    }
-
-    while (1)
-    {
-        // Receive data from other vehicles
-        if (recvfrom(sockfd, (struct VehicleData *)&vehicle_data, sizeof(vehicle_data), 0, (struct sockaddr *)&address, (socklen_t *)&addrlen) < 0)
-        {
-            perror("Receive failed");
-            exit(EXIT_FAILURE);
-        }
-
-        // Process received data
-        printf("Received data from Vehicle ID %d: Speed=%.2f, Direction=%d\n",
-               vehicle_data.vehicle_id, vehicle_data.speed, vehicle_data.direction);
-
-        // Add logic here to update neighborhood based on received data
-    }
-
-    close(sockfd);
-    return NULL;
+		for (int i = 0; i < VEHICLE_COUNT; i++)
+		{
+			struct vehicle temp = vehicleList[i];
+			struct vehicle self = vehicleList[PORT - 8000];
+			if (temp.vehicle_id != -1 && temp.vehicle_id != self.vehicle_id &&
+				temp.direction == self.direction)
+			{
+				printf("Vehicle id: %d, speed: %.2f, direction: %d",
+					   temp.vehicle_id, temp.speed, temp.direction);
+			}
+		}
+		printf("\n");
+	}
+	close(sockfd);
+	return NULL;
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    pthread_t receiver_thread;
+	if (argc != 2)
+	{
+		printf("format: %s <port number>", argv[0]);
+		exit(1);
+	}
+	int PORT = atoi(argv[1]);
+	if (PORT < 8000 || PORT > 8000 + VEHICLE_COUNT - 1)
+	{
+		printf("Invalid port number");
+		exit(1);
+	}
 
-    // Create receiver thread
-    if (pthread_create(&receiver_thread, NULL, receive_data, NULL) != 0)
-    {
-        perror("Thread creation failed");
-        exit(EXIT_FAILURE);
-    }
+	int sockfd;
+	pthread_t thread_id;
+	struct sockaddr_in peer_addr;
+	struct vehicle vehicle_data;
 
-    // Main thread continues for sending data
+	// initialising vehicles datastructure
+	for (int i = 0; i < VEHICLE_COUNT; i++)
+		vehicleList[i].vehicle_id = -1;
 
-    struct sockaddr_in address;
-    int sockfd;
-    struct VehicleData vehicle_data;
+	// creating thread for receieving data
+	pthread_create(&thread_id, NULL, receive_data, (void *)&PORT);
 
-    // Create UDP socket
-    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-    {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+	{
+		perror("Error while creating socket");
+		exit(1);
+	}
 
-    memset(&address, 0, sizeof(address));
+	memset(&peer_addr, '\0', sizeof(peer_addr));
+	peer_addr.sin_family = AF_INET;
+	peer_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	vehicle_data.vehicle_id = PORT;
 
-    address.sin_family = AF_INET;
-    address.sin_port = htons(PORT);
-    address.sin_addr.s_addr = inet_addr("255.255.255.255"); // Broadcast address
+	while (1)
+	{
+		printf("Enter speed: ");
+		scanf("%f", &vehicle_data.speed);
+		printf("Enter direction(0/1): ");
+		scanf("%d", &vehicle_data.direction);
 
-    // Set broadcast option
-    int broadcast_enable = 1;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0)
-    {
-        perror("Setsockopt failed");
-        exit(EXIT_FAILURE);
-    }
+		for (int i = 0; i < VEHICLE_COUNT; i++)
+		{
+			peer_addr.sin_port = htons(8000 + i);
+			sendto(sockfd, (const struct vehicle *)&vehicle_data, sizeof(vehicle_data), 0,
+				   (struct sockaddr *)&peer_addr, sizeof(peer_addr));
+		}
+		sleep(15);
+	}
 
-    // Main loop for sending data
-    while (1)
-    {
-        // Prepare data to send
-        vehicle_data.vehicle_id = 123; // Example vehicle ID
-        vehicle_data.speed = 60.0;     // Example speed
-        vehicle_data.direction = 1;    // Example direction
-
-        // Send data to all vehicles
-        if (sendto(sockfd, (const struct VehicleData *)&vehicle_data, sizeof(vehicle_data), 0, (const struct sockaddr *)&address, sizeof(address)) < 0)
-        {
-            perror("Sendto failed");
-            exit(EXIT_FAILURE);
-        }
-
-        printf("Sent data: Vehicle ID %d, Speed=%.2f, Direction=%d\n",
-               vehicle_data.vehicle_id, vehicle_data.speed, vehicle_data.direction);
-
-        sleep(5); // Send data every 5 seconds
-    }
-
-    close(sockfd);
-    pthread_join(receiver_thread, NULL);
-    return 0;
+	close(sockfd);
+	pthread_join(thread_id, NULL);
+	return 0;
 }

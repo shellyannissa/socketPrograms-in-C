@@ -53,15 +53,15 @@ void *receive_data(void *arg)
 		}
 		int idx = vehicle_data.vehicle_id - 8000;
 		vehicleList[idx] = vehicle_data;
+		struct vehicle self = vehicleList[PORT - 8000];
 
 		for (int i = 0; i < VEHICLE_COUNT; i++)
 		{
 			struct vehicle temp = vehicleList[i];
-			struct vehicle self = vehicleList[PORT - 8000];
 			if (temp.vehicle_id != -1 && temp.vehicle_id != self.vehicle_id &&
 				temp.direction == self.direction)
 			{
-				printf("Vehicle id: %d, speed: %.2f, direction: %d",
+				printf("Vehicle id: %d, speed: %.2f, direction: %d\n",
 					   temp.vehicle_id, temp.speed, temp.direction);
 			}
 		}
